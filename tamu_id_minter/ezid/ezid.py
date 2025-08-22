@@ -1,6 +1,8 @@
 import csv
 import requests
 import os
+from datetime import datetime
+from tqdm import tqdm
 
 
 class EZIDARKHandler:
@@ -132,6 +134,23 @@ class EZIDARKHandler:
         else:
             return False, f"{ark} status failed with {response.status_code}"
 
+    def batch_switch_status(self, input_csv, status="public"):
+        arks = []
+        messages = []
+        with open(input_csv, 'r') as my_csv:
+            reader = csv.DictReader(my_csv)
+            for row in reader:
+                ark_url = row.get("ark")
+                arks.append(ark_url.replace("https://n2t.net/", ""))
+        for ark in tqdm(arks):
+            x = self.switch_status(ark, status)
+            messages.append(x)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        with open(f"{input_csv.replace(".csv", timestamp)}.csv", "w") as output_csv:
+            writer = csv.DictWriter(output_csv, fieldnames=["Success", "Message"])
+            writer.writeheader()
+            for msg in messages:
+                writer.writerow({"Success": msg[0], "Message": msg[1]})
 
 
 if __name__ == "__main__":

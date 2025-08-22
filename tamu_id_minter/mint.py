@@ -38,3 +38,21 @@ def create_arks(input_csv, output_csv):
 def get_ark(ark):
     handler = EZIDARKHandler()
     handler.get_ark(ark)
+
+@cli.command(
+    "switch_statuses", help="Switch status for all items in a CSV"
+)
+@click.option(
+    "--status",
+    "-s",
+    help="The status to switch to: public, reserved, unavailable",
+    default="public"
+)
+@click.option(
+    "--input_csv",
+    "-i",
+    help="The path to the CSV including ARK metadata",
+)
+def switch_statuses(status, input_csv):
+    handler = EZIDARKHandler()
+    handler.batch_switch_status(input_csv, status)

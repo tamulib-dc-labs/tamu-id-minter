@@ -38,3 +38,14 @@ For reports:
  tamu_mint generate_crossref_deposit -i reports.csv -t report
 ```
 
+## Optional Settings
+
+If you hate putting stuff in over and over again, you can use environmental variables:
+
+```shell
+export CROSSREF_DEPOSITOR_NAME="Mark Baggett"
+export CROSSREF_DEPOSITOR_EMAIL="mark.baggett@tamu.edu"
+export CROSSREF_REGISTRANT="Texas A&M University"
+
+```
+

@@ -1,5 +1,6 @@
 import click
 from tamu_id_minter import EZIDARKHandler
+from tamu_id_minter.crossref import CrossrefDepositHandler
 
 @click.group()
 def cli() -> None:
@@ -56,3 +57,59 @@ def get_ark(ark):
 def switch_statuses(status, input_csv):
     handler = EZIDARKHandler()
     handler.batch_switch_status(input_csv, status)
+
+
+@cli.command(
+    "generate_crossref_deposit",
+    help="Generate Crossref XML deposit file from CSV metadata"
+)
+@click.option(
+    "--input_csv",
+    "-i",
+    required=True,
+    help="Path to CSV file with metadata (Title, Contributor, Acceptance date, DOI, Resource)",
+)
+@click.option(
+    "--output_xml",
+    "-o",
+    help="Path for output XML file (default: crossref-deposit-{type}-{timestamp}.xml)",
+)
+@click.option(
+    "--content_type",
+    "-t",
+    type=click.Choice(['pending_publication', 'report'], case_sensitive=False),
+    required=True,
+    help="Type of content: pending_publication or report",
+)
+@click.option(
+    "--depositor_name",
+    default="TAMU Libraries",
+    help="Depositor organization name",
+)
+@click.option(
+    "--depositor_email",
+    default="depositor@library.tamu.edu",
+    help="Depositor contact email",
+)
+@click.option(
+    "--registrant",
+    default="Texas A&M University",
+    help="Registrant organization name",
+)
+def generate_crossref_deposit(input_csv, output_xml, content_type,
+                              depositor_name, depositor_email, registrant):
+    """Generate Crossref XML deposit file from CSV metadata."""
+    handler = CrossrefDepositHandler(
+        depositor_name=depositor_name,
+        depositor_email=depositor_email,
+        registrant=registrant
+    )
+
+    result_file = handler.create_batch_from_csv(
+        input_csv,
+        output_xml,
+        content_type
+    )
+
+    print(f"Generated Crossref deposit XML: {result_file}")
+    print(f"Processed {len(handler.completed)} records")

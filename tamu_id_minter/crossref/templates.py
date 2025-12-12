@@ -84,6 +84,8 @@ class CrossrefXMLTemplate:
             parts = contributor_string.split(' and ')
         elif ' ; ' in contributor_string:
             parts = contributor_string.split(' ; ')
+        elif ' | ' in contributor_string:
+            parts = contributor_string.split(' | ')
         else:
             parts = [contributor_string]
 

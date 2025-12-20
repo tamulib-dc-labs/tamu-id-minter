@@ -49,3 +49,10 @@ export CROSSREF_REGISTRANT="Texas A&M University"
 
 ```
 
+## Running Tests
+
+You can run all tests like this:
+
+```
+python -m unittest discover -s tests -p "test_*.py" -v
+```

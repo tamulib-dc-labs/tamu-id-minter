@@ -1,7 +1,13 @@
 import unittest
-from unittest.mock import patch, mock_open
+from xml.etree import ElementTree as ET
+from unittest.mock import Mock, patch, mock_open
 from tamu_id_minter.crossref.crossref import (
     CrossrefDepositHandler
+)
+
+from tamu_id_minter.crossref.templates import (
+    PendingPublicationTemplate,
+    ReportTemplate
 )
 
 class TestCrossref(unittest.TestCase):
@@ -120,16 +126,89 @@ class TestCrossref(unittest.TestCase):
         assert metadata_list[0]['title'] == 'Sample Title'
         assert metadata_list[1]['title'] == 'Another Title'
 
-
-    # def test_generate_deposit_xml(self):
-
-    # -------------------------------------- #
-
-    # def test_save_xml(self):
-    #     '''
-    #     Test that XML content is saved correctly to a file.
-    #     When I call save_xml() with known XML content and output file path, the file must be created with the correct content.
+    def test_stops_on_first_invalid_row(self):
         '''
+        Test that processing stops on the first invalid row.
+        When I call process_csv() with a CSV where an invalid row appears after valid rows, processing must stop and raise ValueError at the first invalid row.
+        '''
+        sample_csv = """Title,Contributor,Acceptance date,DOI,Resource
+                        Valid Title,Dummy Name,2025-01-01,10.1234/example.d,https://example.com/resource
+                        ,Another Name,2025-02-01,10.5678/another.d,https://example.com/another"""
+
+        with patch("builtins.open", mock_open(read_data=sample_csv)):
+            with self.assertRaises(ValueError) as context:
+                self.handler.process_csv("dummy_path.csv")
+        
+        self.assertIn("Missing Title in row", str(context.exception))
+        assert len(self.handler.completed) == 1  # Only the first valid row processed
+        assert self.handler.completed[0]['title'] == 'Valid Title'
+
+    # ------------------ TESTING THE BEHAVIOR OF GENERATE_DEPOSIT_XML METHOD ---------------------- #
+
+    def test_template_selection_and_batch_id_pending_publication(self):
+        mock_templates = Mock()
+        mock_templates.create_doi_batch.return_value = ET.Element("doi_batch")
+        mock_templates.prettify_xml.return_value = "<xml />"
+
+        mock_datetime = Mock()
+        mock_datetime.now.return_value.strftime.return_value = "20260105123456"
+
+        content_config = ('pending_publication', PendingPublicationTemplate, "create_pending_publication", "TAMU-PENDING-PUBLICATION-")
+        content_type, template_class, content_method, batch_prefix = content_config
+
+        with patch("tamu_id_minter.crossref.crossref.PendingPublicationTemplate", return_value=mock_templates,), \
+            patch("tamu_id_minter.crossref.crossref.datetime",mock_datetime,
+        ):
+            self.handler.generate_deposit_xml("pending_publication", [])
+
+        args = mock_templates.create_doi_batch.call_args[0]
+        batch_id = args[3]
+
+        self.assertTrue(batch_id.startswith(batch_prefix))
+        self.assertTrue(batch_id.endswith("20260105123456"))
+
+    def test_template_selection_and_batch_id_report(self):
+        mock_templates = Mock()
+        mock_templates.create_doi_batch.return_value = ET.Element("doi_batch")
+        mock_templates.prettify_xml.return_value = "<xml />"
+
+        mock_datetime = Mock()
+        mock_datetime.now.return_value.strftime.return_value = "20260105123456"
+
+        content_config = ('report', ReportTemplate, "create_report", "TAMU-REPORT-")
+        content_type, template_class, content_method, batch_prefix = content_config
+
+        with patch("tamu_id_minter.crossref.crossref.ReportTemplate", return_value=mock_templates,), \
+            patch("tamu_id_minter.crossref.crossref.datetime",mock_datetime,
+        ):
+            self.handler.generate_deposit_xml("report", [])
+
+        args = mock_templates.create_doi_batch.call_args[0]
+        batch_id = args[3]
+
+        self.assertTrue(batch_id.startswith(batch_prefix))
+        self.assertTrue(batch_id.endswith("20260105123456"))
+
+
+    # ---------------- TESTING THE BEHAVIOR OF SAVE_XML METHOD ---------------------- #
+
+    def test_save_xml(self):
+        '''
+        Test that XML content is saved correctly to a file.
+        When I call save_xml() with known XML content and output file path, the file must be created with the correct content.
+        '''
+
+        xml_content = "<test>Sample XML Content</test>"
+        output_file = "dummy_output.xml"
+
+        m = mock_open()
+
+        with patch("builtins.open", m):
+            self.handler.save_xml(xml_content, output_file)
+        
+        m.assert_called_once_with(output_file, 'w', encoding='utf-8')
+        handle = m()
+        handle.write.assert_called_once_with(xml_content)
     
     # -------------------------------------- #
 
@@ -138,3 +217,7 @@ class TestCrossref(unittest.TestCase):
     #     Test the end-to-end process of creating a Crossref deposit XML from a CSV file.
     #     When I call create_batch_from_csv() with known inputs, the output XML file must be created with expected content.
     #     '''
+
+
+
+

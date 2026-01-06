@@ -2,8 +2,6 @@ import unittest
 from xml.etree.ElementTree import Element
 from tamu_id_minter.crossref.templates import (
     CrossrefXMLTemplate,
-    PendingPublicationTemplate,
-    ReportTemplate
 )
 
 

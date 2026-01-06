@@ -11,7 +11,6 @@ from tamu_id_minter.crossref.templates import (
 )
 
 class TestCrossref(unittest.TestCase):
-    
     ''' Testcases for Crossref functionality. '''
 
     def setUp(self):
@@ -157,15 +156,19 @@ class TestCrossref(unittest.TestCase):
         content_type, template_class, content_method, batch_prefix = content_config
 
         with patch("tamu_id_minter.crossref.crossref.PendingPublicationTemplate", return_value=mock_templates,), \
-            patch("tamu_id_minter.crossref.crossref.datetime",mock_datetime,
-        ):
-            self.handler.generate_deposit_xml("pending_publication", [])
+            patch("tamu_id_minter.crossref.crossref.datetime",mock_datetime,):
+            self.handler.generate_deposit_xml(content_type, [{'Title':'Sample'}])
 
         args = mock_templates.create_doi_batch.call_args[0]
         batch_id = args[3]
 
         self.assertTrue(batch_id.startswith(batch_prefix))
         self.assertTrue(batch_id.endswith("20260105123456"))
+        mock_templates.create_pending_publication.assert_called_once()
+        mock_templates.create_report_paper.assert_not_called()
+
+    
+    # -------------------------------------- #
 
     def test_template_selection_and_batch_id_report(self):
         mock_templates = Mock()
@@ -175,19 +178,35 @@ class TestCrossref(unittest.TestCase):
         mock_datetime = Mock()
         mock_datetime.now.return_value.strftime.return_value = "20260105123456"
 
-        content_config = ('report', ReportTemplate, "create_report", "TAMU-REPORT-")
+        content_config = ('report', ReportTemplate, "create_report_paper", "TAMU-REPORT-")
         content_type, template_class, content_method, batch_prefix = content_config
 
         with patch("tamu_id_minter.crossref.crossref.ReportTemplate", return_value=mock_templates,), \
-            patch("tamu_id_minter.crossref.crossref.datetime",mock_datetime,
-        ):
-            self.handler.generate_deposit_xml("report", [])
+            patch("tamu_id_minter.crossref.crossref.datetime",mock_datetime,):
+            self.handler.generate_deposit_xml(content_type, [{'Title':'Sample'}])
 
         args = mock_templates.create_doi_batch.call_args[0]
         batch_id = args[3]
 
         self.assertTrue(batch_id.startswith(batch_prefix))
         self.assertTrue(batch_id.endswith("20260105123456"))
+        mock_templates.create_pending_publication.assert_not_called()
+        mock_templates.create_report_paper.assert_called_once()
+
+    # -------------------------------------- #
+
+    def test_invalid_content_type_raises_value_error(self):
+        '''
+        Test that an invalid content type raises ValueError.
+        When I call generate_deposit_xml() with an invalid content type, it must raise a ValueError.
+        '''
+
+        with self.assertRaises(ValueError) as context:
+            self.handler.generate_deposit_xml("invalid_content_type", [])
+        
+        self.assertIn("Invalid content_type", str(context.exception))
+
+
 
 
     # ---------------- TESTING THE BEHAVIOR OF SAVE_XML METHOD ---------------------- #
@@ -219,5 +238,56 @@ class TestCrossref(unittest.TestCase):
     #     '''
 
 
+    def test_create_batch_from_csv_full_flow(self):
+        with patch.object(
+            self.handler, "process_csv", return_value=[{"id": 1}]
+        ) as mock_process, patch.object(
+            self.handler, "generate_deposit_xml", return_value="<xml />"
+        ) as mock_generate, patch.object(
+            self.handler, "save_xml"
+        ) as mock_save:
+            
+            result = self.handler.create_batch_from_csv(
+                input_file="input.csv",
+                output_file="out.xml",
+                content_type="report",
+            )
 
+        self.assertEqual(result, "out.xml")
+        mock_process.assert_called_once()
+        mock_generate.assert_called_once()
+        mock_save.assert_called_once()
 
+    # -------------------------------------- #
+
+    def test_create_batch_from_csv_generates_default_output_filename(self):
+
+        mock_datetime = Mock()
+        mock_datetime.now.return_value.strftime.return_value = "20260105_123456"
+
+        with patch.object(
+            self.handler, "process_csv", return_value=[{"id": 1}]
+        ) as mock_process, patch.object(
+            self.handler, "generate_deposit_xml", return_value="<xml />"
+        ) as mock_generate, patch.object(
+            self.handler, "save_xml"
+        ) as mock_save, patch(
+            "tamu_id_minter.crossref.crossref.datetime"
+        ) as mock_datetime:
+
+            mock_datetime.now.return_value.strftime.return_value = "20260105_123456"
+
+            result = self.handler.create_batch_from_csv(
+                input_file="input.csv",
+                output_file=None,
+                content_type="pending_publication",
+            )
+
+        expected_filename = "crossref-deposit-pending_publication-20260105_123456.xml"
+        self.assertEqual(result, expected_filename)
+        mock_process.assert_called_once()
+        mock_generate.assert_called_once()
+        mock_save.assert_called_once()
+    
+if __name__ == '__main__':
+    unittest.main()

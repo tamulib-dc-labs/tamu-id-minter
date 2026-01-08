@@ -9,7 +9,7 @@ Application for easily minting ARKs, DOIs, and other ids.
 Create ARKs:
 
 ```shell
- tamu_mint create_ark -i test.csv
+ tamu_mint create_arks -i test.csv
 ```
 
 Get an Ark:
